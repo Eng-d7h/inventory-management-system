@@ -2,7 +2,8 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithEmailAndPassword } from "firebase/auth";
@@ -18,6 +19,14 @@ export default function RegisterPage() {
     const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+   const { user, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      router.replace("/");
+    }
+  }, [user, authLoading, router]);
+
 
   async function handleSignUp() {
     setError("");

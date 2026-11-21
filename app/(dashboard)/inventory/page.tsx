@@ -8,6 +8,7 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Table, { Column } from "@/components/ui/Table";
 import StockMovementModal from "@/components/inventory/StockMovementModal";
+import StockMovementsTable from "@/components/inventory/StockMovementsTable";
 import { getStockStatus, stockStatusInfo } from "@/lib/stock";
 import { Product } from "@/types/product";
 import { TransactionType } from "@/types/inventory";
@@ -110,9 +111,7 @@ export default function InventoryPage() {
             />
           ))}
 
-        {tab === "movements" && (
-          <p className="rounded-xl bg-white p-6 text-gray-500 shadow-sm">Coming soon.</p>
-        )}
+        {tab === "movements" && <StockMovementsTable />}
       </main>
 
       {/* Render only when open, so the form starts empty every time */}

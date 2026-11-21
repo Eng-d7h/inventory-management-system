@@ -6,19 +6,15 @@ import { db } from "@/lib/firebase";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Table, { Column } from "@/components/ui/Table";
+import Badge from "@/components/ui/Badge";
 import CategoriesModal from "@/components/products/CategoriesModal";
 import ProductFormModal from "@/components/products/ProductFormModal";
 import { Category } from "@/types/category";
 import { Supplier } from "@/types/supplier";
 import { Product } from "@/types/product";
+import { getStockStatus, stockStatusInfo } from "@/lib/stock";
+import { formatMoney } from "@/lib/format";
 
-// Simple columns for now. Step P3 adds names, badges and more.
-const columns: Column<Product>[] = [
-  { header: "Name", render: (p) => <span className="font-medium">{p.name}</span> },
-  { header: "SKU", render: (p) => p.sku },
-  { header: "Stock", render: (p) => p.currentStock },
-  { header: "Status", render: (p) => p.status },
-];
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -28,6 +24,45 @@ export default function ProductsPage() {
   const [error, setError] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+
+  // Turn an id into a name, e.g. categoryId -> "Electronics"
+  function categoryName(id: string) {
+    return categories.find((c) => c.id === id)?.name ?? "-";
+  }
+
+  function supplierName(id: string) {
+    return suppliers.find((s) => s.id === id)?.companyName ?? "-";
+  }
+
+  const columns: Column<Product>[] = [
+    { header: "Name", render: (p) => <span className="font-medium">{p.name}</span> },
+    { header: "SKU", render: (p) => <span className="font-mono text-xs">{p.sku}</span> },
+    { header: "Category", render: (p) => categoryName(p.categoryId) },
+    { header: "Supplier", render: (p) => supplierName(p.supplierId) },
+    { header: "Buy", render: (p) => formatMoney(p.purchasePrice) },
+    { header: "Sell", render: (p) => formatMoney(p.sellingPrice) },
+    {
+      header: "Stock",
+      render: (p) => {
+        const info = stockStatusInfo[getStockStatus(p.currentStock, p.minimumStock)];
+        return (
+          <div className="flex items-center gap-2">
+            <span className="w-8 font-medium">{p.currentStock}</span>
+            <Badge color={info.color}>{info.label}</Badge>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Status",
+      render: (p) =>
+        p.status === "active" ? (
+          <span className="text-sm text-gray-700">Active</span>
+        ) : (
+          <Badge color="gray">Inactive</Badge>
+        ),
+    },
+  ];
 
   useEffect(() => {
     // Listen to 3 collections at once. Each returns an "unsubscribe" function.
@@ -88,6 +123,7 @@ export default function ProductsPage() {
             columns={columns}
             data={products}
             getRowKey={(p) => p.id}
+            rowClassName={(p) => (p.status === "inactive" ? "opacity-50" : "")}
             emptyMessage="No products yet. Click “Add Product” to create one."
           />
         )}

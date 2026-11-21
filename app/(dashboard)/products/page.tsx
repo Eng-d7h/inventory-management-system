@@ -1,7 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
@@ -9,6 +17,7 @@ import Table, { Column } from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import CategoriesModal from "@/components/products/CategoriesModal";
 import ProductFormModal from "@/components/products/ProductFormModal";
 import { Category } from "@/types/category";
@@ -26,6 +35,12 @@ export default function ProductsPage() {
   const [error, setError] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  // The product being edited (null = adding a new one)
+  const [editing, setEditing] = useState<Product | null>(null);
+  // The product waiting for "Deactivate" confirmation
+  const [deactivating, setDeactivating] = useState<Product | null>(null);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState("");
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
 
@@ -47,6 +62,34 @@ export default function ProductsPage() {
 
   function supplierName(id: string) {
     return suppliers.find((s) => s.id === id)?.companyName ?? "-";
+  }
+
+  function openAdd() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(product: Product) {
+    setEditing(product);
+    setFormOpen(true);
+  }
+
+  // No hard delete (decision 6): we only switch status active <-> inactive
+  async function changeStatus(product: Product, status: Product["status"]) {
+    setStatusLoading(true);
+    setStatusError("");
+    try {
+      await updateDoc(doc(db, "products", product.id), {
+        status,
+        updatedAt: serverTimestamp(),
+      });
+      setDeactivating(null);
+    } catch (err) {
+      console.error(err);
+      setStatusError("Could not update the product. Please try again.");
+    } finally {
+      setStatusLoading(false);
+    }
   }
 
   const columns: Column<Product>[] = [
@@ -76,6 +119,32 @@ export default function ProductsPage() {
         ) : (
           <Badge color="gray">Inactive</Badge>
         ),
+    },
+    {
+      header: "Actions",
+      className: "text-right",
+      render: (p) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => openEdit(p)}>
+            Edit
+          </Button>
+          {p.status === "active" ? (
+            <Button
+              variant="danger"
+              onClick={() => {
+                setStatusError("");
+                setDeactivating(p);
+              }}
+            >
+              Deactivate
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => changeStatus(p, "active")}>
+              Activate
+            </Button>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -125,7 +194,7 @@ export default function ProductsPage() {
             <Button variant="secondary" onClick={() => setCategoriesOpen(true)}>
               Manage Categories
             </Button>
-            <Button onClick={() => setFormOpen(true)}>+ Add Product</Button>
+            <Button onClick={openAdd}>+ Add Product</Button>
           </div>
         </div>
 
@@ -151,6 +220,9 @@ export default function ProductsPage() {
         </div>
 
         {error && <p className="text-sm text-danger">{error}</p>}
+        {statusError && !deactivating && (
+          <p className="text-sm text-danger">{statusError}</p>
+        )}
 
         {loading ? (
           <p className="text-gray-500">Loading products...</p>
@@ -182,8 +254,27 @@ export default function ProductsPage() {
           onClose={() => setFormOpen(false)}
           categories={categories}
           suppliers={suppliers}
+          product={editing}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deactivating}
+        title="Deactivate Product"
+        message={
+          <p>
+            Deactivate <strong>{deactivating?.name}</strong>? It will stay in the
+            table (faded) but will be hidden from Stock In / Stock Out. You can
+            activate it again at any time.
+          </p>
+        }
+        confirmLabel="Deactivate"
+        loadingLabel="Saving..."
+        loading={statusLoading}
+        error={statusError}
+        onConfirm={() => deactivating && changeStatus(deactivating, "inactive")}
+        onCancel={() => setDeactivating(null)}
+      />
     </>
   );
 }

@@ -8,6 +8,7 @@ import {
   limit,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -19,7 +20,7 @@ import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import { Category } from "@/types/category";
 import { Supplier } from "@/types/supplier";
-import { ProductStatus } from "@/types/product";
+import { Product, ProductStatus } from "@/types/product";
 
 // Numbers are kept as text while typing, then converted on save
 type FormData = {
@@ -61,7 +62,7 @@ function isWholeNumber(value: string) {
   return Number.isInteger(Number(value)) && Number(value) >= 0 && value.trim() !== "";
 }
 
-function validate(form: FormData): Errors {
+function validate(form: FormData, isEdit: boolean): Errors {
   const errors: Errors = {};
   if (!form.name.trim()) errors.name = "Name is required.";
   if (!form.sku.trim()) errors.sku = "SKU is required.";
@@ -70,23 +71,42 @@ function validate(form: FormData): Errors {
   if (!isPrice(form.purchasePrice)) errors.purchasePrice = "Enter a price of 0 or more.";
   if (!isPrice(form.sellingPrice)) errors.sellingPrice = "Enter a price of 0 or more.";
   if (!isWholeNumber(form.minimumStock)) errors.minimumStock = "Enter a whole number (0 or more).";
-  if (!isWholeNumber(form.initialStock)) errors.initialStock = "Enter a whole number (0 or more).";
+  if (!isEdit && !isWholeNumber(form.initialStock)) errors.initialStock = "Enter a whole number (0 or more).";
   return errors;
 }
 
+// If "product" is given, the form is in Edit mode. Otherwise it is in Add mode.
 export default function ProductFormModal({
   open,
   onClose,
   categories,
   suppliers,
+  product,
 }: {
   open: boolean;
   onClose: () => void;
   categories: Category[];
   suppliers: Supplier[];
+  product?: Product | null;
 }) {
   const { user, profile } = useAuth();
-  const [form, setForm] = useState<FormData>(emptyForm);
+  const isEdit = !!product;
+
+  const [form, setForm] = useState<FormData>(
+    product
+      ? {
+          name: product.name,
+          sku: product.sku,
+          categoryId: product.categoryId,
+          supplierId: product.supplierId,
+          purchasePrice: String(product.purchasePrice),
+          sellingPrice: String(product.sellingPrice),
+          minimumStock: String(product.minimumStock),
+          initialStock: "0", // not used in Edit mode
+          status: product.status,
+        }
+      : emptyForm
+  );
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -102,7 +122,7 @@ export default function ProductFormModal({
     Number(form.sellingPrice) < Number(form.purchasePrice);
 
   async function handleSave() {
-    const newErrors = validate(form);
+    const newErrors = validate(form, isEdit);
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0 || !user) return;
 
@@ -111,17 +131,36 @@ export default function ProductFormModal({
     try {
       const sku = normalizeSku(form.sku);
 
-      // 1) SKU must be unique (decision 8)
+      // 1) SKU must be unique (decision 8). In Edit mode, ignore the product itself.
       const existing = await getDocs(
-        query(collection(db, "products"), where("sku", "==", sku), limit(1))
+        query(collection(db, "products"), where("sku", "==", sku), limit(2))
       );
-      if (!existing.empty) {
+      const usedByOther = existing.docs.some((d) => d.id !== product?.id);
+      if (usedByOther) {
         setErrors({ sku: "This SKU is already used by another product." });
         return;
       }
 
-      const initialStock = Number(form.initialStock);
       const name = form.name.trim();
+
+      if (product) {
+        // Edit: update the fields. currentStock is NOT touched (decision 1).
+        await updateDoc(doc(db, "products", product.id), {
+          name,
+          sku,
+          categoryId: form.categoryId,
+          supplierId: form.supplierId,
+          purchasePrice: Number(form.purchasePrice),
+          sellingPrice: Number(form.sellingPrice),
+          minimumStock: Number(form.minimumStock),
+          status: form.status,
+          updatedAt: serverTimestamp(),
+        });
+        onClose();
+        return;
+      }
+
+      const initialStock = Number(form.initialStock);
 
       // 2) A batch saves everything together: all writes succeed, or none do
       const batch = writeBatch(db);
@@ -171,7 +210,7 @@ export default function ProductFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title="Add Product"
+      title={isEdit ? "Edit Product" : "Add Product"}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>
@@ -267,16 +306,27 @@ export default function ProductFormModal({
           onChange={(e) => updateField("minimumStock", e.target.value)}
           error={errors.minimumStock}
         />
-        <Input
-          label="Initial Stock"
-          name="initialStock"
-          type="number"
-          min="0"
-          step="1"
-          value={form.initialStock}
-          onChange={(e) => updateField("initialStock", e.target.value)}
-          error={errors.initialStock}
-        />
+        {product ? (
+          // Current Stock is shown but never editable (changes only via Stock In/Out)
+          <div>
+            <p className="mb-1 block text-sm font-medium text-gray-700">Current Stock</p>
+            <p className="rounded-lg border border-gray-200 bg-gray-100 px-4 py-2.5 text-gray-600">
+              {product.currentStock}
+            </p>
+            <p className="mt-1 text-xs text-gray-500">Change stock from the Inventory page.</p>
+          </div>
+        ) : (
+          <Input
+            label="Initial Stock"
+            name="initialStock"
+            type="number"
+            min="0"
+            step="1"
+            value={form.initialStock}
+            onChange={(e) => updateField("initialStock", e.target.value)}
+            error={errors.initialStock}
+          />
+        )}
         {saveError && <p className="text-sm text-danger sm:col-span-2">{saveError}</p>}
       </div>
     </Modal>

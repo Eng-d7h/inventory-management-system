@@ -8,6 +8,7 @@ type ConfirmDialogProps = {
   title: string;
   message: React.ReactNode;
   confirmLabel?: string;
+  loadingLabel?: string;
   loading?: boolean;
   confirmDisabled?: boolean;
   error?: string;
@@ -15,12 +16,13 @@ type ConfirmDialogProps = {
   onCancel: () => void;
 };
 
-// A small "Are you sure?" dialog, used before any delete
+// A small "Are you sure?" dialog, used before delete or deactivate
 export default function ConfirmDialog({
   open,
   title,
   message,
   confirmLabel = "Delete",
+  loadingLabel = "Deleting...",
   loading = false,
   confirmDisabled = false,
   error,
@@ -42,7 +44,7 @@ export default function ConfirmDialog({
             onClick={onConfirm}
             disabled={loading || confirmDisabled}
           >
-            {loading ? "Deleting..." : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </Button>
         </>
       }

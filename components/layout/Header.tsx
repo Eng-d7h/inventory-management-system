@@ -3,6 +3,7 @@
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
+import { LogOut } from "lucide-react";
 
 export default function Header({ title }: { title: string }) {
   const { profile, user } = useAuth();
@@ -34,8 +35,9 @@ export default function Header({ title }: { title: string }) {
         <button
           type="button"
           onClick={() => signOut(auth)}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+          className="flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
         >
+          <LogOut className="h-4 w-4" />
           Logout
         </button>
       </div>

@@ -3,15 +3,25 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  ArrowLeftRight,
+  ChartColumn,
+  LayoutDashboard,
+  Package,
+  Truck,
+  Warehouse,
+} from "lucide-react";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { needsAttention } from "@/lib/stock";
 
 const links = [
-  { href: "/", label: "Dashboard" },
-  { href: "/products", label: "Products" },
-  { href: "/suppliers", label: "Suppliers" },
-  { href: "/inventory", label: "Inventory" },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/products", label: "Products", icon: Package },
+  { href: "/suppliers", label: "Suppliers", icon: Truck },
+  { href: "/inventory", label: "Inventory", icon: Warehouse },
+  { href: "/transactions", label: "Transactions", icon: ArrowLeftRight },
+  { href: "/reports", label: "Reports", icon: ChartColumn },
 ];
 
 export default function Sidebar() {
@@ -57,7 +67,10 @@ export default function Sidebar() {
                   : "border-transparent hover:bg-primary-dark/60"
               }`}
             >
-              <span>{link.label}</span>
+              <span className="flex items-center gap-3">
+                <link.icon className="h-5 w-5" />
+                {link.label}
+              </span>
               {link.href === "/inventory" && alertCount > 0 && (
                 <span
                   title={`${alertCount} product(s) low or out of stock`}

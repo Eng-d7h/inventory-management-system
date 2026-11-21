@@ -13,6 +13,8 @@ import {
 import { db } from "@/lib/firebase";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import { Ban, Pencil, Plus, RotateCcw } from "lucide-react";
 import Table, { Column } from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
 import Input from "@/components/ui/Input";
@@ -124,24 +126,25 @@ export default function ProductsPage() {
       header: "Actions",
       className: "text-right",
       render: (p) => (
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => openEdit(p)}>
-            Edit
-          </Button>
+        <div className="flex justify-end gap-1">
+          <IconButton icon={Pencil} label="Edit" color="primary" onClick={() => openEdit(p)} />
           {p.status === "active" ? (
-            <Button
-              variant="danger"
+            <IconButton
+              icon={Ban}
+              label="Deactivate"
+              color="danger"
               onClick={() => {
                 setStatusError("");
                 setDeactivating(p);
               }}
-            >
-              Deactivate
-            </Button>
+            />
           ) : (
-            <Button variant="secondary" onClick={() => changeStatus(p, "active")}>
-              Activate
-            </Button>
+            <IconButton
+              icon={RotateCcw}
+              label="Activate"
+              color="accent"
+              onClick={() => changeStatus(p, "active")}
+            />
           )}
         </div>
       ),
@@ -194,7 +197,9 @@ export default function ProductsPage() {
             <Button variant="secondary" onClick={() => setCategoriesOpen(true)}>
               Manage Categories
             </Button>
-            <Button onClick={openAdd}>+ Add Product</Button>
+            <Button onClick={openAdd} className="flex items-center gap-1.5">
+              <Plus className="h-4 w-4" /> Add Product
+            </Button>
           </div>
         </div>
 

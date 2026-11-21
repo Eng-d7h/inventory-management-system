@@ -15,6 +15,8 @@ import {
 import { db } from "@/lib/firebase";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
+import IconButton from "@/components/ui/IconButton";
+import { Mail, Pencil, Phone, Plus, Trash2 } from "lucide-react";
 import Table, { Column } from "@/components/ui/Table";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import SupplierFormModal from "@/components/suppliers/SupplierFormModal";
@@ -106,9 +108,13 @@ export default function SuppliersPage() {
     {
       header: "Contact",
       render: (s) => (
-        <div className="space-y-0.5 text-sm">
-          <p>✉️ {s.email}</p>
-          <p>📞 {s.phone}</p>
+        <div className="space-y-1 text-sm">
+          <p className="flex items-center gap-2">
+            <Mail className="h-4 w-4 text-gray-400" /> {s.email}
+          </p>
+          <p className="flex items-center gap-2">
+            <Phone className="h-4 w-4 text-gray-400" /> {s.phone}
+          </p>
         </div>
       ),
     },
@@ -124,13 +130,9 @@ export default function SuppliersPage() {
       header: "Actions",
       className: "text-right",
       render: (s) => (
-        <div className="flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => openEdit(s)}>
-            Edit
-          </Button>
-          <Button variant="danger" onClick={() => openDelete(s)}>
-            Delete
-          </Button>
+        <div className="flex justify-end gap-1">
+          <IconButton icon={Pencil} label="Edit" color="primary" onClick={() => openEdit(s)} />
+          <IconButton icon={Trash2} label="Delete" color="danger" onClick={() => openDelete(s)} />
         </div>
       ),
     },
@@ -182,7 +184,9 @@ export default function SuppliersPage() {
       <main className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-gray-800">Suppliers</h1>
-          <Button onClick={openAdd}>+ Add Supplier</Button>
+          <Button onClick={openAdd} className="flex items-center gap-1.5">
+            <Plus className="h-4 w-4" /> Add Supplier
+          </Button>
         </div>
 
         {error && <p className="text-sm text-danger">{error}</p>}

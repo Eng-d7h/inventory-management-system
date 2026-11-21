@@ -45,3 +45,10 @@
 17. **Sidebar:** Dashboard, Products, Suppliers, Inventory.
 18. **Forms** open as modals over the page.
 19. **Language:** English interface.
+
+## Plan changes
+
+20. **Suppliers before Products:** the Suppliers page is built before Products,
+    so the product form has suppliers to choose from.
+21. **Categories:** no separate page. A "Manage Categories" button on the
+    Products page opens a modal to add and list categories.

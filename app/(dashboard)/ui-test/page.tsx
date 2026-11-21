@@ -8,6 +8,43 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import Table, { Column } from "@/components/ui/Table";
+
+// Fake data, only for this test page
+type DemoProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  stock: number;
+  minimumStock: number;
+  status: "active" | "inactive";
+};
+
+const demoProducts: DemoProduct[] = [
+  { id: "1", name: "Wireless Mouse", sku: "SKU-001", stock: 50, minimumStock: 10, status: "active" },
+  { id: "2", name: "USB Cable", sku: "SKU-002", stock: 5, minimumStock: 10, status: "active" },
+  { id: "3", name: "Keyboard", sku: "SKU-003", stock: 0, minimumStock: 5, status: "active" },
+  { id: "4", name: "Old Monitor", sku: "SKU-004", stock: 3, minimumStock: 2, status: "inactive" },
+];
+
+const demoColumns: Column<DemoProduct>[] = [
+  { header: "Name", render: (p) => <span className="font-medium">{p.name}</span> },
+  { header: "SKU", render: (p) => p.sku },
+  { header: "Stock", render: (p) => p.stock },
+  {
+    header: "Status",
+    render: (p) =>
+      p.status === "inactive" ? (
+        <Badge color="gray">Inactive</Badge>
+      ) : p.stock === 0 ? (
+        <Badge color="red">Out of Stock</Badge>
+      ) : p.stock <= p.minimumStock ? (
+        <Badge color="yellow">Low Stock</Badge>
+      ) : (
+        <Badge color="green">In Stock</Badge>
+      ),
+  },
+];
 
 export default function UiTestPage() {
   const [name, setName] = useState("");
@@ -84,6 +121,26 @@ export default function UiTestPage() {
         <section className="space-y-3 rounded-xl bg-white p-6 shadow-sm">
           <h2 className="font-semibold">Modal</h2>
           <Button onClick={() => setModalOpen(true)}>Open Modal</Button>
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-semibold">Table</h2>
+          <Table
+            columns={demoColumns}
+            data={demoProducts}
+            getRowKey={(p) => p.id}
+            rowClassName={(p) => (p.status === "inactive" ? "opacity-50" : "")}
+          />
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="font-semibold">Empty Table</h2>
+          <Table
+            columns={demoColumns}
+            data={[]}
+            getRowKey={(p) => p.id}
+            emptyMessage="No products yet."
+          />
         </section>
       </main>
 

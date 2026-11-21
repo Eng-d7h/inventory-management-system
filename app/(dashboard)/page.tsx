@@ -112,7 +112,7 @@ export default function DashboardPage() {
               <section className="rounded-xl bg-white p-5 shadow-sm">
                 <div className="mb-4 flex items-center justify-between">
                   <h2 className="font-semibold text-gray-800">Recent Transactions</h2>
-                  <Link href="/inventory" className="text-sm font-medium text-primary hover:underline">
+                  <Link href="/transactions" className="text-sm font-medium text-primary hover:underline">
                     View all
                   </Link>
                 </div>

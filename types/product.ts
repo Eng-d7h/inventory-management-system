@@ -10,7 +10,9 @@ export type Product = {
   supplierId: string;
   purchasePrice: number;
   sellingPrice: number;
-  currentStock: number;
+  currentStock: number; // total of all warehouses
+  // Units per warehouse: { warehouseId: units }. Missing on old products.
+  stockByWarehouse?: Record<string, number>;
   minimumStock: number;
   status: ProductStatus;
   createdAt: Timestamp | null;

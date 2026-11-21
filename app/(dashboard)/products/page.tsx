@@ -7,6 +7,8 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Table, { Column } from "@/components/ui/Table";
 import Badge from "@/components/ui/Badge";
+import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 import CategoriesModal from "@/components/products/CategoriesModal";
 import ProductFormModal from "@/components/products/ProductFormModal";
 import { Category } from "@/types/category";
@@ -24,6 +26,19 @@ export default function ProductsPage() {
   const [error, setError] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+
+  // Filter the list in the browser (no extra database reads)
+  const searchText = search.trim().toLowerCase();
+  const filteredProducts = products.filter((p) => {
+    const matchesSearch =
+      searchText === "" ||
+      p.name.toLowerCase().includes(searchText) ||
+      p.sku.toLowerCase().includes(searchText);
+    const matchesCategory = categoryFilter === "" || p.categoryId === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
 
   // Turn an id into a name, e.g. categoryId -> "Electronics"
   function categoryName(id: string) {
@@ -114,6 +129,27 @@ export default function ProductsPage() {
           </div>
         </div>
 
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="sm:w-80">
+            <Input
+              name="search"
+              type="search"
+              placeholder="Search by name or SKU..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="sm:w-56">
+            <Select
+              name="categoryFilter"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              placeholder="All categories"
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            />
+          </div>
+        </div>
+
         {error && <p className="text-sm text-danger">{error}</p>}
 
         {loading ? (
@@ -121,10 +157,14 @@ export default function ProductsPage() {
         ) : (
           <Table
             columns={columns}
-            data={products}
+            data={filteredProducts}
             getRowKey={(p) => p.id}
             rowClassName={(p) => (p.status === "inactive" ? "opacity-50" : "")}
-            emptyMessage="No products yet. Click “Add Product” to create one."
+            emptyMessage={
+              products.length === 0
+                ? "No products yet. Click “Add Product” to create one."
+                : "No products match your search."
+            }
           />
         )}
       </main>

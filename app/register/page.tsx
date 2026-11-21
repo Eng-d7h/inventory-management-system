@@ -1,7 +1,5 @@
 "use client";
 
-"use client";
-
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -19,7 +17,7 @@ export default function RegisterPage() {
     const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-   const { user, loading: authLoading } = useAuth();
+   const { user, loading: authLoading, refreshProfile } = useAuth();
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -42,7 +40,11 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
 
       await setDoc(doc(db, "users", cred.user.uid), {
         name: name.trim(),
@@ -50,6 +52,9 @@ export default function RegisterPage() {
         role: "admin",
         createdAt: serverTimestamp(),
       });
+
+      // Load the new profile so the Header shows the name and role right away
+      await refreshProfile();
 
       router.push("/");
         } catch (err: unknown) {

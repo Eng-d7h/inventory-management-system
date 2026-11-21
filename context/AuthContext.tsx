@@ -10,13 +10,26 @@ type AuthContextType = {
   user: User | null;
   profile: UserProfile | null;
   loading: boolean;
+  refreshProfile: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
+  refreshProfile: async () => {},
 });
+
+// Reads users/{uid}. Returns null if the document is missing or reading fails.
+async function loadProfile(uid: string): Promise<UserProfile | null> {
+  try {
+    const snap = await getDoc(doc(db, "users", uid));
+    return snap.exists() ? (snap.data() as UserProfile) : null;
+  } catch (err) {
+    console.error("Failed to load user profile:", err);
+    return null;
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -26,22 +39,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-
-      if (firebaseUser) {
-        const snap = await getDoc(doc(db, "users", firebaseUser.uid));
-        setProfile(snap.exists() ? (snap.data() as UserProfile) : null);
-      } else {
-        setProfile(null);
-      }
-
+      setProfile(firebaseUser ? await loadProfile(firebaseUser.uid) : null);
       setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
+  // Call this after creating/updating the users document (e.g. after Register).
+  async function refreshProfile() {
+    const current = auth.currentUser;
+    if (current) {
+      setProfile(await loadProfile(current.uid));
+    }
+  }
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading }}>
+    <AuthContext.Provider value={{ user, profile, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

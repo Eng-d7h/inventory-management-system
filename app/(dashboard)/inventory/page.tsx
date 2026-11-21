@@ -9,7 +9,7 @@ import Badge from "@/components/ui/Badge";
 import Table, { Column } from "@/components/ui/Table";
 import StockMovementModal from "@/components/inventory/StockMovementModal";
 import StockMovementsTable from "@/components/inventory/StockMovementsTable";
-import { getStockStatus, stockStatusInfo } from "@/lib/stock";
+import { getStockStatus, needsAttention, stockStatusInfo } from "@/lib/stock";
 import { Product } from "@/types/product";
 import { TransactionType } from "@/types/inventory";
 
@@ -43,6 +43,7 @@ export default function InventoryPage() {
   const [error, setError] = useState("");
   // Which modal is open: "in", "out", or null (closed)
   const [movementType, setMovementType] = useState<TransactionType | null>(null);
+  const [lowOnly, setLowOnly] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
@@ -62,6 +63,10 @@ export default function InventoryPage() {
 
   // Inactive products are hidden here (decision 7)
   const activeProducts = products.filter((p) => p.status === "active");
+
+  // Low stock alerts (active products that are low or out of stock)
+  const alertProducts = activeProducts.filter(needsAttention);
+  const tableProducts = lowOnly ? alertProducts : activeProducts;
 
   const tabClass = (t: Tab) =>
     `border-b-2 px-4 py-2 text-sm font-medium transition ${
@@ -84,6 +89,27 @@ export default function InventoryPage() {
           </div>
         </div>
 
+        {alertProducts.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/40 bg-warning/15 px-4 py-3 text-sm text-yellow-900">
+            <span>
+              ⚠️ <strong>{alertProducts.length}</strong> product(s) are low or out of
+              stock.
+            </span>
+            {!lowOnly && (
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("stock");
+                  setLowOnly(true);
+                }}
+                className="font-medium underline"
+              >
+                Show them
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex gap-2 border-b border-gray-200">
           <button type="button" className={tabClass("stock")} onClick={() => setTab("stock")}>
             Stock by Product
@@ -103,12 +129,27 @@ export default function InventoryPage() {
           (loading ? (
             <p className="text-gray-500">Loading...</p>
           ) : (
-            <Table
-              columns={stockColumns}
-              data={activeProducts}
-              getRowKey={(p) => p.id}
-              emptyMessage="No active products. Add products from the Products page."
-            />
+            <div className="space-y-3">
+              <label className="flex w-fit cursor-pointer items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={lowOnly}
+                  onChange={(e) => setLowOnly(e.target.checked)}
+                  className="h-4 w-4 accent-primary"
+                />
+                Low stock only
+              </label>
+              <Table
+                columns={stockColumns}
+                data={tableProducts}
+                getRowKey={(p) => p.id}
+                emptyMessage={
+                  lowOnly
+                    ? "All good! No products are low or out of stock."
+                    : "No active products. Add products from the Products page."
+                }
+              />
+            </div>
           ))}
 
         {tab === "movements" && <StockMovementsTable />}

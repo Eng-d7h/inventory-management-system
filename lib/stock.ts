@@ -17,3 +17,15 @@ export const stockStatusInfo: Record<
   low: { label: "Low Stock", color: "yellow" },
   out: { label: "Out of Stock", color: "red" },
 };
+
+// True if an ACTIVE product is low or out of stock (used for alerts)
+export function needsAttention(product: {
+  status: string;
+  currentStock: number;
+  minimumStock: number;
+}) {
+  return (
+    product.status === "active" &&
+    getStockStatus(product.currentStock, product.minimumStock) !== "in"
+  );
+}

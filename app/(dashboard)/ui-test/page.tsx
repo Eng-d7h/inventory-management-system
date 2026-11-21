@@ -7,10 +7,36 @@ import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Badge from "@/components/ui/Badge";
+import Modal from "@/components/ui/Modal";
 
 export default function UiTestPage() {
   const [name, setName] = useState("");
   const [clicks, setClicks] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalName, setModalName] = useState("");
+  const [modalSku, setModalSku] = useState("");
+  const [errors, setErrors] = useState<{ name?: string; sku?: string }>({});
+
+  function closeModal() {
+    setModalOpen(false);
+    setModalName("");
+    setModalSku("");
+    setErrors({});
+  }
+
+  function handleSave() {
+    const newErrors: { name?: string; sku?: string } = {};
+    if (!modalName.trim()) newErrors.name = "Name is required.";
+    if (!modalSku.trim()) newErrors.sku = "SKU is required.";
+
+    setErrors(newErrors);
+
+    // Stop here if there is any error (keep the modal open)
+    if (Object.keys(newErrors).length > 0) return;
+
+    alert(`Saved: ${modalName} (${modalSku})`);
+    closeModal();
+  }
 
   return (
     <>
@@ -54,7 +80,45 @@ export default function UiTestPage() {
             <Badge color="gray">Inactive</Badge>
           </div>
         </section>
+
+        <section className="space-y-3 rounded-xl bg-white p-6 shadow-sm">
+          <h2 className="font-semibold">Modal</h2>
+          <Button onClick={() => setModalOpen(true)}>Open Modal</Button>
+        </section>
       </main>
+
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Add Product"
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeModal}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>Save</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Name"
+            name="modalName"
+            placeholder="Product name"
+            value={modalName}
+            onChange={(e) => setModalName(e.target.value)}
+            error={errors.name}
+          />
+          <Input
+            label="SKU"
+            name="modalSku"
+            placeholder="e.g. SKU-001"
+            value={modalSku}
+            onChange={(e) => setModalSku(e.target.value)}
+            error={errors.sku}
+          />
+        </div>
+      </Modal>
     </>
   );
 }

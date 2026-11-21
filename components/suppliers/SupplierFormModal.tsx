@@ -1,12 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { SupplierFormData } from "@/types/supplier";
+import { Supplier, SupplierFormData } from "@/types/supplier";
 
 const emptyForm: SupplierFormData = {
   companyName: "",
@@ -31,14 +37,30 @@ function validate(form: SupplierFormData): Errors {
   return errors;
 }
 
+// If "supplier" is given, the form is in Edit mode. Otherwise it is in Add mode.
 export default function SupplierFormModal({
   open,
   onClose,
+  supplier,
 }: {
   open: boolean;
   onClose: () => void;
+  supplier?: Supplier | null;
 }) {
-  const [form, setForm] = useState<SupplierFormData>(emptyForm);
+  const isEdit = !!supplier;
+
+  // Start with the supplier's current values (Edit) or empty fields (Add)
+  const [form, setForm] = useState<SupplierFormData>(
+    supplier
+      ? {
+          companyName: supplier.companyName,
+          contactPerson: supplier.contactPerson,
+          email: supplier.email,
+          phone: supplier.phone,
+          address: supplier.address ?? "",
+        }
+      : emptyForm
+  );
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
@@ -48,12 +70,6 @@ export default function SupplierFormModal({
     setForm({ ...form, [field]: value });
   }
 
-  function handleClose() {
-    setForm(emptyForm);
-    setErrors({});
-    setSaveError("");
-    onClose();
-  }
 
   async function handleSave() {
     const newErrors = validate(form);
@@ -63,15 +79,25 @@ export default function SupplierFormModal({
     setSaving(true);
     setSaveError("");
     try {
-      await addDoc(collection(db, "suppliers"), {
+      const data = {
         companyName: form.companyName.trim(),
         contactPerson: form.contactPerson.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
         address: form.address.trim(),
-        createdAt: serverTimestamp(),
-      });
-      handleClose();
+      };
+
+      if (supplier) {
+        // Edit: update the existing document (createdAt stays the same)
+        await updateDoc(doc(db, "suppliers", supplier.id), data);
+      } else {
+        // Add: create a new document
+        await addDoc(collection(db, "suppliers"), {
+          ...data,
+          createdAt: serverTimestamp(),
+        });
+      }
+      onClose();
     } catch (err) {
       console.error(err);
       setSaveError("Could not save the supplier. Please try again.");
@@ -83,11 +109,11 @@ export default function SupplierFormModal({
   return (
     <Modal
       open={open}
-      onClose={handleClose}
-      title="Add Supplier"
+      onClose={onClose}
+      title={isEdit ? "Edit Supplier" : "Add Supplier"}
       footer={
         <>
-          <Button variant="secondary" onClick={handleClose} disabled={saving}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}>

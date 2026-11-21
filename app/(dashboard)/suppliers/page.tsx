@@ -18,41 +18,62 @@ function getInitials(name: string) {
     .toUpperCase();
 }
 
-const columns: Column<Supplier>[] = [
-  {
-    header: "Company",
-    render: (s) => (
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
-          {getInitials(s.companyName)}
-        </div>
-        <div>
-          <p className="font-medium text-gray-800">{s.companyName}</p>
-          <p className="text-xs text-gray-500">{s.contactPerson}</p>
-        </div>
-      </div>
-    ),
-  },
-  {
-    header: "Contact",
-    render: (s) => (
-      <div className="space-y-0.5 text-sm">
-        <p>✉️ {s.email}</p>
-        <p>📞 {s.phone}</p>
-      </div>
-    ),
-  },
-  {
-    header: "Address",
-    render: (s) => s.address || <span className="text-gray-400">-</span>,
-  },
-];
-
 export default function SuppliersPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [formOpen, setFormOpen] = useState(false);
+  // The supplier being edited, or null when adding a new one
+  const [editing, setEditing] = useState<Supplier | null>(null);
+
+  function openAdd() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(supplier: Supplier) {
+    setEditing(supplier);
+    setFormOpen(true);
+  }
+
+  const columns: Column<Supplier>[] = [
+    {
+      header: "Company",
+      render: (s) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+            {getInitials(s.companyName)}
+          </div>
+          <div>
+            <p className="font-medium text-gray-800">{s.companyName}</p>
+            <p className="text-xs text-gray-500">{s.contactPerson}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      header: "Contact",
+      render: (s) => (
+        <div className="space-y-0.5 text-sm">
+          <p>✉️ {s.email}</p>
+          <p>📞 {s.phone}</p>
+        </div>
+      ),
+    },
+    {
+      header: "Address",
+      render: (s) => s.address || <span className="text-gray-400">-</span>,
+    },
+    {
+      header: "Actions",
+      className: "text-right",
+      render: (s) => (
+        <Button variant="secondary" onClick={() => openEdit(s)}>
+          Edit
+        </Button>
+      ),
+    },
+  ];
 
   useEffect(() => {
     // Listen to the suppliers collection: the table updates automatically
@@ -82,7 +103,7 @@ export default function SuppliersPage() {
       <main className="space-y-4">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-gray-800">Suppliers</h1>
-          <Button onClick={() => setFormOpen(true)}>+ Add Supplier</Button>
+          <Button onClick={openAdd}>+ Add Supplier</Button>
         </div>
 
         {error && <p className="text-sm text-danger">{error}</p>}
@@ -99,7 +120,14 @@ export default function SuppliersPage() {
         )}
       </main>
 
-      <SupplierFormModal open={formOpen} onClose={() => setFormOpen(false)} />
+      {/* Render the form only when open, so it starts fresh every time */}
+      {formOpen && (
+        <SupplierFormModal
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          supplier={editing}
+        />
+      )}
     </>
   );
 }

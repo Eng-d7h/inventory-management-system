@@ -1,11 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, orderBy, query } from "firebase/firestore";
+import {
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  where,
+} from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Header from "@/components/layout/Header";
 import Button from "@/components/ui/Button";
 import Table, { Column } from "@/components/ui/Table";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import SupplierFormModal from "@/components/suppliers/SupplierFormModal";
 import { Supplier } from "@/types/supplier";
 
@@ -26,6 +37,14 @@ export default function SuppliersPage() {
   // The supplier being edited, or null when adding a new one
   const [editing, setEditing] = useState<Supplier | null>(null);
 
+  // Number of products for each supplier: { supplierId: count }
+  const [productCounts, setProductCounts] = useState<Record<string, number>>({});
+
+  // The supplier the user wants to delete (null = dialog closed)
+  const [deleting, setDeleting] = useState<Supplier | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
   function openAdd() {
     setEditing(null);
     setFormOpen(true);
@@ -34,6 +53,39 @@ export default function SuppliersPage() {
   function openEdit(supplier: Supplier) {
     setEditing(supplier);
     setFormOpen(true);
+  }
+
+  function openDelete(supplier: Supplier) {
+    setDeleteError("");
+    setDeleting(supplier);
+  }
+
+  async function handleDelete() {
+    if (!deleting) return;
+    setDeleteLoading(true);
+    setDeleteError("");
+    try {
+      // Check the database again right before deleting (safety check)
+      const linked = await getDocs(
+        query(
+          collection(db, "products"),
+          where("supplierId", "==", deleting.id),
+          limit(1)
+        )
+      );
+      if (!linked.empty) {
+        setDeleteError("This supplier has products and cannot be deleted.");
+        return;
+      }
+
+      await deleteDoc(doc(db, "suppliers", deleting.id));
+      setDeleting(null);
+    } catch (err) {
+      console.error(err);
+      setDeleteError("Could not delete the supplier. Please try again.");
+    } finally {
+      setDeleteLoading(false);
+    }
   }
 
   const columns: Column<Supplier>[] = [
@@ -65,12 +117,21 @@ export default function SuppliersPage() {
       render: (s) => s.address || <span className="text-gray-400">-</span>,
     },
     {
+      header: "Products",
+      render: (s) => productCounts[s.id] ?? 0,
+    },
+    {
       header: "Actions",
       className: "text-right",
       render: (s) => (
-        <Button variant="secondary" onClick={() => openEdit(s)}>
-          Edit
-        </Button>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => openEdit(s)}>
+            Edit
+          </Button>
+          <Button variant="danger" onClick={() => openDelete(s)}>
+            Delete
+          </Button>
+        </div>
       ),
     },
   ];
@@ -92,6 +153,24 @@ export default function SuppliersPage() {
         setError("Could not load suppliers.");
         setLoading(false);
       }
+    );
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Listen to products and count them per supplier (calculated, not stored)
+    const unsubscribe = onSnapshot(
+      collection(db, "products"),
+      (snapshot) => {
+        const counts: Record<string, number> = {};
+        snapshot.docs.forEach((d) => {
+          const supplierId = d.data().supplierId as string | undefined;
+          if (supplierId) counts[supplierId] = (counts[supplierId] ?? 0) + 1;
+        });
+        setProductCounts(counts);
+      },
+      (err) => console.error(err)
     );
 
     return () => unsubscribe();
@@ -128,6 +207,30 @@ export default function SuppliersPage() {
           supplier={editing}
         />
       )}
+
+      <ConfirmDialog
+        open={!!deleting}
+        title="Delete Supplier"
+        message={
+          deleting && (productCounts[deleting.id] ?? 0) > 0 ? (
+            <p>
+              <strong>{deleting.companyName}</strong> has{" "}
+              {productCounts[deleting.id]} product(s). Move or remove them
+              first; a supplier with products cannot be deleted.
+            </p>
+          ) : (
+            <p>
+              Are you sure you want to delete{" "}
+              <strong>{deleting?.companyName}</strong>? This cannot be undone.
+            </p>
+          )
+        }
+        loading={deleteLoading}
+        confirmDisabled={!!deleting && (productCounts[deleting.id] ?? 0) > 0}
+        error={deleteError}
+        onConfirm={handleDelete}
+        onCancel={() => setDeleting(null)}
+      />
     </>
   );
 }

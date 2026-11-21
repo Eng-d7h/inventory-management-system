@@ -25,6 +25,7 @@ import ProductFormModal from "@/components/products/ProductFormModal";
 import { Category } from "@/types/category";
 import { Supplier } from "@/types/supplier";
 import { Product } from "@/types/product";
+import { Warehouse } from "@/types/warehouse";
 import { getStockStatus, stockStatusInfo } from "@/lib/stock";
 import { formatMoney } from "@/lib/format";
 
@@ -33,6 +34,7 @@ export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [categoriesOpen, setCategoriesOpen] = useState(false);
@@ -180,7 +182,15 @@ export default function ProductsPage() {
       (err) => console.error(err)
     );
 
+    const unsubWarehouses = onSnapshot(
+      query(collection(db, "warehouses"), orderBy("name")),
+      (snapshot) =>
+        setWarehouses(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Warehouse)),
+      (err) => console.error(err)
+    );
+
     return () => {
+      unsubWarehouses();
       unsubProducts();
       unsubCategories();
       unsubSuppliers();
@@ -259,6 +269,7 @@ export default function ProductsPage() {
           onClose={() => setFormOpen(false)}
           categories={categories}
           suppliers={suppliers}
+          warehouses={warehouses}
           product={editing}
         />
       )}

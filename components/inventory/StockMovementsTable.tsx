@@ -18,6 +18,10 @@ const columns: Column<InventoryTransaction>[] = [
   },
   { header: "Product", render: (t) => <span className="font-medium">{t.productName}</span> },
   {
+    header: "Warehouse",
+    render: (t) => t.warehouseName ?? <span className="text-gray-400">-</span>,
+  },
+  {
     header: "Type",
     render: (t) =>
       t.type === "in" ? <Badge color="green">IN</Badge> : <Badge color="red">OUT</Badge>,

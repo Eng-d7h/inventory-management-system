@@ -9,36 +9,53 @@ import Button from "@/components/ui/Button";
 import { recordStockMovement, StockError } from "@/lib/inventory";
 import { Product } from "@/types/product";
 import { TransactionType } from "@/types/inventory";
+import { Warehouse } from "@/types/warehouse";
 
 export default function StockMovementModal({
   open,
   onClose,
   type,
   products,
+  warehouses,
 }: {
   open: boolean;
   onClose: () => void;
   type: TransactionType;
   products: Product[]; // active products only
+  warehouses: Warehouse[];
 }) {
   const { user, profile } = useAuth();
   const [productId, setProductId] = useState("");
+  const [warehouseId, setWarehouseId] = useState("");
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
-  const [errors, setErrors] = useState<{ productId?: string; quantity?: string }>({});
+  const [errors, setErrors] = useState<{
+    productId?: string;
+    warehouseId?: string;
+    quantity?: string;
+  }>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
   const isOut = type === "out";
   const selected = products.find((p) => p.id === productId);
+  const warehouse = warehouses.find((w) => w.id === warehouseId);
   const qty = Number(quantity);
 
-  // Live check for Stock Out: block quantities bigger than the available stock
-  const tooMuch = isOut && !!selected && quantity !== "" && qty > selected.currentStock;
+  // Stock of the chosen product in the chosen warehouse
+  const available =
+    selected && warehouse ? selected.stockByWarehouse?.[warehouse.id] ?? 0 : null;
+  const freeSpace = warehouse ? warehouse.capacity - warehouse.usedUnits : null;
+
+  // Live checks: Stock Out cannot exceed the available stock,
+  // Stock In cannot exceed the free space of the warehouse
+  const limit = isOut ? available : freeSpace;
+  const tooMuch = limit !== null && quantity !== "" && qty > limit;
 
   async function handleSave() {
-    const newErrors: { productId?: string; quantity?: string } = {};
+    const newErrors: typeof errors = {};
     if (!productId) newErrors.productId = "Please choose a product.";
+    if (!warehouseId) newErrors.warehouseId = "Please choose a warehouse.";
     if (!Number.isInteger(qty) || qty <= 0) {
       newErrors.quantity = "Enter a whole number greater than 0.";
     }
@@ -50,6 +67,7 @@ export default function StockMovementModal({
     try {
       await recordStockMovement({
         productId,
+        warehouseId,
         type,
         quantity: qty,
         note,
@@ -103,9 +121,26 @@ export default function StockMovementModal({
               label: `${p.name} (${p.sku})`,
             }))}
           />
-          {selected && (
+        </div>
+
+        <div>
+          <Select
+            label="Warehouse"
+            name="warehouseId"
+            value={warehouseId}
+            onChange={(e) => setWarehouseId(e.target.value)}
+            error={errors.warehouseId}
+            placeholder={warehouses.length ? "Choose a warehouse" : "No warehouses yet"}
+            options={warehouses.map((w) => ({ value: w.id, label: `${w.name} (${w.location})` }))}
+          />
+          {isOut && available !== null && (
             <p className="mt-1 text-sm text-gray-600">
-              Available: <strong>{selected.currentStock}</strong>
+              Available in this warehouse: <strong>{available}</strong>
+            </p>
+          )}
+          {!isOut && freeSpace !== null && (
+            <p className="mt-1 text-sm text-gray-600">
+              Free space: <strong>{freeSpace.toLocaleString()}</strong> unit(s)
             </p>
           )}
         </div>
@@ -121,7 +156,11 @@ export default function StockMovementModal({
           onChange={(e) => setQuantity(e.target.value)}
           error={
             errors.quantity ??
-            (tooMuch ? `You can remove at most ${selected?.currentStock}.` : undefined)
+            (tooMuch
+              ? isOut
+                ? `You can remove at most ${available}.`
+                : `Only ${freeSpace} unit(s) of free space.`
+              : undefined)
           }
         />
 

@@ -40,11 +40,22 @@ The number of products per supplier is NOT stored. It is calculated from `produc
 | supplierId | string | document ID from `suppliers` |
 | purchasePrice | number | 0 or more |
 | sellingPrice | number | 0 or more |
-| currentStock | number | integer, changes only through transactions |
+| currentStock | number | integer, total of all warehouses, changes only through transactions |
+| stockByWarehouse | map | `{ warehouseId: units }`, changes only through transactions |
 | minimumStock | number | integer |
 | status | string | "active" or "inactive" |
 | createdAt | Timestamp | |
 | updatedAt | Timestamp | |
+
+## warehouses
+
+| Field | Type | Note |
+|---|---|---|
+| name | string | unique (case-insensitive) |
+| location | string | |
+| capacity | number | integer > 0, max units |
+| usedUnits | number | units stored now, updated by every stock movement |
+| createdAt | Timestamp | |
 
 ## inventoryTransactions
 
@@ -52,10 +63,12 @@ The number of products per supplier is NOT stored. It is calculated from `produc
 |---|---|---|
 | productId | string | |
 | productName | string | copy of the name at the time of the transaction |
+| warehouseId | string | missing on movements made before warehouses existed |
+| warehouseName | string | copy of the warehouse name |
 | type | string | "in" or "out" |
 | quantity | number | positive integer |
-| stockBefore | number | |
-| stockAfter | number | |
+| stockBefore | number | product total (all warehouses) |
+| stockAfter | number | product total (all warehouses) |
 | note | string | |
 | createdBy | string | user uid |
 | createdByName | string | user name at the time of the transaction |
@@ -66,5 +79,5 @@ The number of products per supplier is NOT stored. It is calculated from `produc
 ```text
 suppliers ──< products >── categories
                  │
-                 └──< inventoryTransactions
+                 └──< inventoryTransactions >── warehouses
 ```

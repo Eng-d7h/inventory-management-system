@@ -7,10 +7,10 @@ import {
   getDocs,
   limit,
   query,
+  runTransaction,
   serverTimestamp,
   updateDoc,
   where,
-  writeBatch,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -21,6 +21,7 @@ import Button from "@/components/ui/Button";
 import { Category } from "@/types/category";
 import { Supplier } from "@/types/supplier";
 import { Product, ProductStatus } from "@/types/product";
+import { Warehouse } from "@/types/warehouse";
 
 // Numbers are kept as text while typing, then converted on save
 type FormData = {
@@ -32,6 +33,7 @@ type FormData = {
   sellingPrice: string;
   minimumStock: string;
   initialStock: string;
+  initialWarehouseId: string; // where the initial stock is stored
   status: ProductStatus;
 };
 
@@ -46,6 +48,7 @@ const emptyForm: FormData = {
   sellingPrice: "",
   minimumStock: "0",
   initialStock: "0",
+  initialWarehouseId: "",
   status: "active",
 };
 
@@ -72,6 +75,9 @@ function validate(form: FormData, isEdit: boolean): Errors {
   if (!isPrice(form.sellingPrice)) errors.sellingPrice = "Enter a price of 0 or more.";
   if (!isWholeNumber(form.minimumStock)) errors.minimumStock = "Enter a whole number (0 or more).";
   if (!isEdit && !isWholeNumber(form.initialStock)) errors.initialStock = "Enter a whole number (0 or more).";
+  if (!isEdit && Number(form.initialStock) > 0 && !form.initialWarehouseId) {
+    errors.initialWarehouseId = "Choose where to store the initial stock.";
+  }
   return errors;
 }
 
@@ -81,12 +87,14 @@ export default function ProductFormModal({
   onClose,
   categories,
   suppliers,
+  warehouses,
   product,
 }: {
   open: boolean;
   onClose: () => void;
   categories: Category[];
   suppliers: Supplier[];
+  warehouses: Warehouse[];
   product?: Product | null;
 }) {
   const { user, profile } = useAuth();
@@ -103,6 +111,7 @@ export default function ProductFormModal({
           sellingPrice: String(product.sellingPrice),
           minimumStock: String(product.minimumStock),
           initialStock: "0", // not used in Edit mode
+          initialWarehouseId: "",
           status: product.status,
         }
       : emptyForm
@@ -161,46 +170,75 @@ export default function ProductFormModal({
       }
 
       const initialStock = Number(form.initialStock);
-
-      // 2) A batch saves everything together: all writes succeed, or none do
-      const batch = writeBatch(db);
+      const warehouseId = initialStock > 0 ? form.initialWarehouseId : "";
       const productRef = doc(collection(db, "products")); // new id
 
-      batch.set(productRef, {
-        name,
-        sku,
-        categoryId: form.categoryId,
-        supplierId: form.supplierId,
-        purchasePrice: Number(form.purchasePrice),
-        sellingPrice: Number(form.sellingPrice),
-        currentStock: initialStock,
-        minimumStock: Number(form.minimumStock),
-        status: form.status,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      // 2) A transaction saves everything together: all writes succeed, or none do.
+      //    It also reads the warehouse to check its free space.
+      await runTransaction(db, async (transaction) => {
+        let warehouseName = "";
 
-      // 3) Initial stock > 0 creates an "in" transaction (decision 9)
-      if (initialStock > 0) {
-        batch.set(doc(collection(db, "inventoryTransactions")), {
-          productId: productRef.id,
-          productName: name,
-          type: "in",
-          quantity: initialStock,
-          stockBefore: 0,
-          stockAfter: initialStock,
-          note: "Initial stock",
-          createdBy: user.uid,
-          createdByName: profile?.name ?? user.email ?? "Unknown",
+        if (warehouseId) {
+          const warehouseRef = doc(db, "warehouses", warehouseId);
+          const warehouseSnap = await transaction.get(warehouseRef);
+          if (!warehouseSnap.exists()) throw new Error("WAREHOUSE_MISSING");
+
+          const w = warehouseSnap.data();
+          const free = Number(w.capacity) - Number(w.usedUnits ?? 0);
+          if (initialStock > free) throw new Error(`WAREHOUSE_FULL:${free}`);
+
+          warehouseName = w.name;
+          transaction.update(warehouseRef, {
+            usedUnits: Number(w.usedUnits ?? 0) + initialStock,
+          });
+        }
+
+        transaction.set(productRef, {
+          name,
+          sku,
+          categoryId: form.categoryId,
+          supplierId: form.supplierId,
+          purchasePrice: Number(form.purchasePrice),
+          sellingPrice: Number(form.sellingPrice),
+          currentStock: initialStock,
+          stockByWarehouse: warehouseId ? { [warehouseId]: initialStock } : {},
+          minimumStock: Number(form.minimumStock),
+          status: form.status,
           createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         });
-      }
 
-      await batch.commit();
+        // 3) Initial stock > 0 creates an "in" transaction (decision 9)
+        if (warehouseId) {
+          transaction.set(doc(collection(db, "inventoryTransactions")), {
+            productId: productRef.id,
+            productName: name,
+            warehouseId,
+            warehouseName,
+            type: "in",
+            quantity: initialStock,
+            stockBefore: 0,
+            stockAfter: initialStock,
+            note: "Initial stock",
+            createdBy: user.uid,
+            createdByName: profile?.name ?? user.email ?? "Unknown",
+            createdAt: serverTimestamp(),
+          });
+        }
+      });
       onClose();
     } catch (err) {
       console.error(err);
-      setSaveError("Could not save the product. Please try again.");
+      const msg = err instanceof Error ? err.message : "";
+      if (msg.startsWith("WAREHOUSE_FULL:")) {
+        setErrors({
+          initialStock: `Not enough space in this warehouse. Free: ${msg.split(":")[1]} unit(s).`,
+        });
+      } else if (msg === "WAREHOUSE_MISSING") {
+        setErrors({ initialWarehouseId: "This warehouse no longer exists." });
+      } else {
+        setSaveError("Could not save the product. Please try again.");
+      }
     } finally {
       setSaving(false);
     }
@@ -326,6 +364,22 @@ export default function ProductFormModal({
             onChange={(e) => updateField("initialStock", e.target.value)}
             error={errors.initialStock}
           />
+        )}
+        {!product && Number(form.initialStock) > 0 && (
+          <div className="sm:col-span-2">
+            <Select
+              label="Initial Stock Warehouse"
+              name="initialWarehouseId"
+              value={form.initialWarehouseId}
+              onChange={(e) => updateField("initialWarehouseId", e.target.value)}
+              error={errors.initialWarehouseId}
+              placeholder={warehouses.length ? "Choose a warehouse" : "No warehouses yet"}
+              options={warehouses.map((w) => ({
+                value: w.id,
+                label: `${w.name} (free: ${(w.capacity - w.usedUnits).toLocaleString()})`,
+              }))}
+            />
+          </div>
         )}
         {saveError && <p className="text-sm text-danger sm:col-span-2">{saveError}</p>}
       </div>

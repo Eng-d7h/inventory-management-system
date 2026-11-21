@@ -174,7 +174,8 @@ export default function InventoryPage() {
           open
           type={movementType}
           onClose={() => setMovementType(null)}
-          products={activeProducts}
+          products={activeProducts.filter((p) => !needsWarehouseSetup(p))}
+          warehouses={warehouses}
         />
       )}
     </>

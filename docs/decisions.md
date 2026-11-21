@@ -52,3 +52,16 @@
     so the product form has suppliers to choose from.
 21. **Categories:** no separate page. A "Manage Categories" button on the
     Products page opens a modal to add and list categories.
+
+## Warehouses
+
+22. **Multiple warehouses:** each product stores `stockByWarehouse` (units per
+    warehouse) and `currentStock` (the total). Both change only inside a
+    Firestore Transaction, together with the warehouse `usedUnits` and the
+    transaction record.
+23. **Capacity:** Stock In is blocked when it would exceed the warehouse capacity.
+    Status: >= 90% Full (red), >= 75% Almost Full (yellow), otherwise OK (green).
+24. **Stock Out** is checked per warehouse (cannot remove more than that warehouse holds).
+25. **Old products:** a one-time setup on the Inventory page assigns their stock
+    to one warehouse.
+26. **Delete warehouse:** only when it is empty (usedUnits = 0).
